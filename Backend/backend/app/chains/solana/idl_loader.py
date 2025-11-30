@@ -1,0 +1,156 @@
+import json
+import zlib
+import base64
+import hashlib
+from typing import Optional, Dict, Any, List, Tuple
+from solders.pubkey import Pubkey
+from ..base.idl_loader import BaseIDLLoader
+from .rpc_client import SolanaRPCClient
+
+
+ANCHOR_IDL_SEED = b"anchor:idl"
+ANCHOR_DISCRIMINATOR_SIZE = 8
+
+
+def get_idl_address(program_id: str) -> Tuple[Pubkey, int]:
+    program_pubkey = Pubkey.from_string(program_id)
+    seeds = [ANCHOR_IDL_SEED]
+    return Pubkey.find_program_address(seeds, program_pubkey)
+
+
+def compute_discriminator(name: str, prefix: str = "global") -> bytes:
+    preimage = f"{prefix}:{name}"
+    return hashlib.sha256(preimage.encode()).digest()[:8]
+
+
+class SolanaIDLLoader(BaseIDLLoader):
+    def __init__(self, rpc_client: SolanaRPCClient):
+        self.rpc_client = rpc_client
+    
+    async def fetch_idl(self, program_id: str) -> Optional[Dict[str, Any]]:
+        idl_address, _ = get_idl_address(program_id)
+        account_info = await self.rpc_client.get_account_info(str(idl_address), encoding="base64")
+        
+        if not account_info:
+            return None
+        
+        data_b64 = account_info.get("data", [None])[0]
+        if not data_b64:
+            return None
+        
+        raw_data = base64.b64decode(data_b64)
+        
+        if len(raw_data) < 44:
+            return None
+        
+        idl_data = raw_data[44:]
+        
+        try:
+            decompressed = zlib.decompress(idl_data)
+            idl_json = json.loads(decompressed.decode('utf-8'))
+            return idl_json
+        except zlib.error:
+            try:
+                idl_json = json.loads(idl_data.decode('utf-8'))
+                return idl_json
+            except:
+                return None
+        except Exception:
+            return None
+    
+    def parse_instructions(self, idl: Dict[str, Any]) -> List[Dict[str, Any]]:
+        instructions = idl.get("instructions", [])
+        parsed = []
+        
+        for ix in instructions:
+            name = ix.get("name", "unknown")
+            discriminator = ix.get("discriminator")
+            
+            if not discriminator:
+                disc_bytes = compute_discriminator(name)
+                discriminator = list(disc_bytes)
+            
+            accounts = []
+            for acc in ix.get("accounts", []):
+                accounts.append({
+                    "name": acc.get("name", "unknown"),
+                    "isMut": acc.get("isMut", acc.get("writable", False)),
+                    "isSigner": acc.get("isSigner", acc.get("signer", False)),
+                    "docs": acc.get("docs", []),
+                    "optional": acc.get("optional", acc.get("isOptional", False))
+                })
+            
+            args = []
+            for arg in ix.get("args", []):
+                args.append({
+                    "name": arg.get("name", "unknown"),
+                    "type": self._serialize_type(arg.get("type"))
+                })
+            
+            parsed.append({
+                "name": name,
+                "discriminator": discriminator,
+                "accounts": accounts,
+                "args": args,
+                "docs": ix.get("docs", [])
+            })
+        
+        return parsed
+    
+    def parse_types(self, idl: Dict[str, Any]) -> List[Dict[str, Any]]:
+        types = idl.get("types", [])
+        parsed = []
+        
+        for t in types:
+            parsed.append({
+                "name": t.get("name", "unknown"),
+                "type": t.get("type")
+            })
+        
+        return parsed
+    
+    def parse_accounts(self, idl: Dict[str, Any]) -> List[Dict[str, Any]]:
+        accounts = idl.get("accounts", [])
+        parsed = []
+        
+        for acc in accounts:
+            parsed.append({
+                "name": acc.get("name", "unknown"),
+                "discriminator": acc.get("discriminator"),
+                "type": acc.get("type")
+            })
+        
+        return parsed
+    
+    def parse_events(self, idl: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return idl.get("events", [])
+    
+    def parse_errors(self, idl: Dict[str, Any]) -> List[Dict[str, Any]]:
+        return idl.get("errors", [])
+    
+    def get_instruction_schema(self, idl: Dict[str, Any], instruction_name: str) -> Optional[Dict[str, Any]]:
+        instructions = self.parse_instructions(idl)
+        for ix in instructions:
+            if ix["name"] == instruction_name:
+                return ix
+        return None
+    
+    def _serialize_type(self, type_def: Any) -> Any:
+        if isinstance(type_def, str):
+            return type_def
+        
+        if isinstance(type_def, dict):
+            if "vec" in type_def:
+                return {"vec": self._serialize_type(type_def["vec"])}
+            if "option" in type_def:
+                return {"option": self._serialize_type(type_def["option"])}
+            if "array" in type_def:
+                arr = type_def["array"]
+                return {"array": [self._serialize_type(arr[0]), arr[1]]}
+            if "defined" in type_def:
+                return {"defined": type_def["defined"]}
+            if "coption" in type_def:
+                return {"coption": self._serialize_type(type_def["coption"])}
+            return type_def
+        
+        return str(type_def)
