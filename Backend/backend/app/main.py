@@ -8,7 +8,7 @@ from .chains.registry import ChainRegistry, initialize_registry
 initialize_registry()
 
 app = FastAPI(
-    title="Multi-Chain Postman Backend",
+    title="ChainCall Backend",
     description="""
 A scalable FastAPI backend for blockchain program introspection, IDL parsing, 
 transaction building, and simulation. Currently supports Solana with an 
@@ -83,7 +83,7 @@ async def root():
         }
     
     return {
-        "name": "Multi-Chain Postman Backend",
+        "name": "ChainCall Backend",
         "version": "2.0.0",
         "status": "running",
         "supported_chains": supported_chains,

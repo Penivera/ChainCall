@@ -32,7 +32,7 @@ export function Layout({ children }: LayoutProps) {
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-2 text-primary">
             <Box className="h-6 w-6" />
-            <h1 className="font-bold text-lg tracking-tight">Solana Postman</h1>
+            <h1 className="font-bold text-lg tracking-tight">ChainCall</h1>
           </div>
           <p className="text-xs text-muted-foreground mt-1 font-mono">v0.1.0-beta</p>
         </div>

@@ -1,6 +1,6 @@
 export const MOCK_IDL = {
   version: "0.1.0",
-  name: "solana_postman_program",
+  name: "chaincall_program",
   instructions: [
     {
       name: "initialize",
@@ -37,13 +37,13 @@ export const MOCK_IDL = {
 export const MOCK_LOGS = [
   "Program 11111111111111111111111111111111 invoke [1]",
   "Program 11111111111111111111111111111111 success",
-  "Program Postman111111111111111111111111111111111 invoke [1]",
+  "Program ChainCall111111111111111111111111111111111 invoke [1]",
   "Program log: Instruction: CreatePost",
   "Program log: Creating new post with title: Hello Solana",
   "Program 11111111111111111111111111111111 invoke [2]",
   "Program 11111111111111111111111111111111 success",
-  "Program Postman111111111111111111111111111111111 consumed 4200 of 200000 compute units",
-  "Program Postman111111111111111111111111111111111 success",
+  "Program ChainCall111111111111111111111111111111111 consumed 4200 of 200000 compute units",
+  "Program ChainCall111111111111111111111111111111111 success",
 ];
 
 export const MOCK_SIMULATION_RESULT = {

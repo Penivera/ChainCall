@@ -47,7 +47,7 @@ export default function AnchorMode() {
               <input 
                 value={programId}
                 onChange={(e) => setProgramId(e.target.value)}
-                placeholder="Ex: Postman111111111111111111111111111111111"
+                placeholder="Ex: ChainCall111111111111111111111111111111111"
                 className="w-full bg-secondary/50 border border-border rounded-md py-2.5 pl-10 pr-4 text-sm font-mono focus:ring-2 focus:ring-primary/50 outline-none transition-all"
               />
             </div>
