@@ -1,8 +1,8 @@
-# Solana Postman
+# ChainCall
 
 ## Overview
 
-Solana Postman is a zero-friction Solana development tool that functions as a "Postman for Solana blockchain". It provides developers with three primary modes for interacting with Solana programs:
+ChainCall is a zero-friction Solana development tool that functions as a "Postman for Solana blockchain". It provides developers with three primary modes for interacting with Solana programs:
 
 1. **Anchor Auto-Magician Mode** - Automatically fetches and parses Anchor IDLs to generate transaction UIs
 2. **Instruction Builder Mode** - Visual byte packer for manually constructing program instructions
@@ -93,7 +93,7 @@ Preferred communication style: Simple, everyday language.
 **Key Database Decisions**:
 - **Why Drizzle**: Type-safe, lightweight, excellent TypeScript integration
 - **Why PostgreSQL**: Robust, supports complex queries, good for structured data
-- **Current State**: Schema is placeholder; actual Solana Postman data models not yet defined
+- **Current State**: Schema is placeholder; actual ChainCall data models not yet defined
 
 ### Type Safety & Validation
 

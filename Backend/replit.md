@@ -1,4 +1,4 @@
-# Multi-Chain Postman Backend
+# ChainCall Backend
 
 ## Overview
 A scalable FastAPI backend that serves as the engine for blockchain interaction tools. The architecture is designed to be chain-agnostic, currently supporting Solana with an extensible structure for adding other chains like Ethereum, Sui, Aptos, and NEAR.
