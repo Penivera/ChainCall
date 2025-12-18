@@ -25,7 +25,7 @@ extensible architecture for adding other chains.
     """,
     version="2.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 app.add_middleware(
@@ -42,18 +42,14 @@ app.include_router(solana_router)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     chain = None
-    if hasattr(request, 'url') and request.url.path:
-        parts = request.url.path.strip('/').split('/')
+    if hasattr(request, "url") and request.url.path:
+        parts = request.url.path.strip("/").split("/")
         if parts and ChainRegistry.is_chain_supported(parts[0]):
             chain = parts[0]
-    
+
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "Internal Server Error",
-            "detail": str(exc),
-            "chain": chain
-        }
+        content={"error": "Internal Server Error", "detail": str(exc), "chain": chain},
     )
 
 
@@ -61,34 +57,34 @@ async def global_exception_handler(request: Request, exc: Exception):
 async def root():
     supported_chains = ChainRegistry.get_supported_chains()
     chain_configs = ChainRegistry.get_all_chain_configs()
-    
+
     endpoints = {}
     for chain in supported_chains:
         endpoints[chain] = {
             "idl": {
                 f"GET /{chain}/idl/{{program_id}}": "Fetch IDL for a program",
-                f"GET /{chain}/idl/{{program_id}}/methods": "Get instruction methods from IDL"
+                f"GET /{chain}/idl/{{program_id}}/methods": "Get instruction methods from IDL",
             },
             "instructions": {
                 f"POST /{chain}/instruction/pack": "Pack instruction data using byte layout",
-                f"GET /{chain}/instruction/types": "Get supported data types"
+                f"POST /{chain}/instruction/unpack": "Unpack instruction data using byte layout",
+                f"GET /{chain}/instruction/types": "Get supported data types",
             },
             "transactions": {
                 f"POST /{chain}/tx/build": "Build an unsigned transaction",
-                f"POST /{chain}/tx/simulate": "Simulate a transaction"
+                f"POST /{chain}/tx/simulate": "Simulate a transaction",
+                f"POST /{chain}/tx/send": "Send a signed transaction",
             },
-            "accounts": {
-                f"POST /{chain}/accounts/info": "Get account information"
-            }
+            "accounts": {f"POST /{chain}/accounts/info": "Get account information"},
         }
-    
+
     return {
         "name": "Multi-Chain Postman Backend",
         "version": "2.0.0",
         "status": "running",
         "supported_chains": supported_chains,
         "architecture": "multi-chain-ready",
-        "endpoints": endpoints
+        "endpoints": endpoints,
     }
 
 
@@ -108,7 +104,7 @@ async def get_supported_chains():
                 name=config.get("name", chain_id.title()),
                 default_rpc_url=config.get("default_rpc_url", ""),
                 supported_features=config.get("supported_features", []),
-                data_types=config.get("data_types", [])
+                data_types=config.get("data_types", []),
             )
         )
     return SupportedChainsResponse(chains=chains)

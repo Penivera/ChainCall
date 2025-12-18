@@ -44,6 +44,16 @@ class PackInstructionResponse(BaseModel):
     length: int
 
 
+class UnpackInstructionRequest(BaseModel):
+    buffer_hex: str
+    layout: List[LayoutField]
+
+
+class UnpackInstructionResponse(BaseModel):
+    chain: str
+    values: List[Any]
+
+
 class AccountMeta(BaseModel):
     pubkey: str
     is_signer: bool = False
@@ -78,6 +88,27 @@ class SimulateTransactionResponse(BaseModel):
     error: Optional[str] = None
     units_consumed: Optional[int] = None
     return_data: Optional[Dict[str, Any]] = None
+
+
+class SendTransactionRequest(BaseModel):
+    rpc_url: Optional[str] = "https://api.testnet.solana.com"
+    transaction_base64: Optional[str] = None
+    program_id: Optional[str] = None
+    accounts: Optional[List[AccountMeta]] = None
+    instruction_data: Optional[str] = Field(
+        default=None, description="Hex or base64 encoded instruction data"
+    )
+    fee_payer: Optional[str] = None
+    sign_with_backend: bool = Field(
+        default=False, description="Sign and send with backend keypair (testnet only)"
+    )
+
+
+class SendTransactionResponse(BaseModel):
+    chain: str
+    signature: str
+    success: bool
+    error: Optional[str] = None
 
 
 class IDLInstruction(BaseModel):
