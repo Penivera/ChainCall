@@ -1,112 +1,238 @@
 import { useState } from "react";
-import { Terminal, ArrowRight, Activity, Database, Coins } from "lucide-react";
-import { MOCK_SIMULATION_RESULT } from "@/lib/mock-data";
+import { Terminal, Activity, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface SimulationResult {
+  logs: string[];
+  unitsConsumed: number;
+  success: boolean;
+  error?: string;
+}
 
 export default function Simulator() {
   const [txHash, setTxHash] = useState("");
-  const [simulated, setSimulated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<SimulationResult | null>(null);
 
-  const handleSimulate = () => {
+  const handleSimulate = async () => {
     if (!txHash) return;
-    setSimulated(true);
+    setIsLoading(true);
+    setResult(null);
+
+    try {
+      const res = await fetch("https://chaincall.onrender.com/solana/tx/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rpc_url: "https://api.mainnet-beta.solana.com",
+          transaction_base64: txHash,
+          encoding: "base64"
+        })
+      });
+
+      const data = await res.json();
+
+      setResult({
+        logs: data.logs || [],
+        unitsConsumed: data.units_consumed || 0,
+        success: data.success,
+        error: data.error
+      });
+
+    } catch (err) {
+      console.error(err);
+      setResult({
+        logs: ["Simulation failed to connect to backend."],
+        unitsConsumed: 0,
+        success: false,
+        error: "Network Error"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Transaction Simulator</h2>
-        <p className="text-muted-foreground">Dry-run transactions against the current network state.</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+        
+        {/* Header + Input Section */}
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Transaction Simulator</h2>
+            <p className="text-muted-foreground mt-1">Dry-run transactions against the current network state.</p>
+          </div>
 
-      {/* Input */}
-      <div className="bg-card border border-border rounded-lg p-6 space-y-4">
-        <label className="text-sm font-medium">Transaction Hash / Base64 Instruction</label>
-        <div className="flex gap-2">
-          <input 
-            value={txHash}
-            onChange={(e) => setTxHash(e.target.value)}
-            placeholder="Paste transaction hash or base64 payload..."
-            className="flex-1 bg-background border border-border rounded-md px-4 py-2 font-mono text-sm outline-none focus:ring-1 focus:ring-primary"
-          />
-          <button 
-            onClick={handleSimulate}
-            className="bg-primary text-primary-foreground px-6 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors"
-          >
-            Simulate
-          </button>
+          <div className="bg-card border border-border rounded-lg p-6 space-y-4 shadow-sm">
+            <label className="text-sm font-medium">Base64 Transaction Payload</label>
+            <div className="flex gap-3">
+              <input 
+                value={txHash}
+                onChange={(e) => setTxHash(e.target.value)}
+                placeholder="Paste base64 transaction string here..."
+                className="flex-1 bg-background border border-border rounded-md px-4 py-2 font-mono text-sm outline-none focus:ring-1 focus:ring-primary transition-all"
+              />
+              <button 
+                onClick={handleSimulate}
+                disabled={isLoading || !txHash}
+                className="bg-primary text-primary-foreground px-6 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Simulate"}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Results Grid */}
-      {simulated && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Results Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Logs */}
+          {/* Program Logs */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2 text-lg font-semibold">
               <Terminal className="h-5 w-5 text-primary" />
               <h3>Program Logs</h3>
             </div>
-            <div className="bg-black border border-border rounded-lg p-4 font-mono text-xs space-y-1.5 h-[400px] overflow-y-auto">
-              {MOCK_SIMULATION_RESULT.logs.map((log, i) => (
-                <div key={i} className={cn(
-                  "flex gap-3",
-                  log.includes("success") ? "text-green-400" : 
-                  log.includes("consumed") ? "text-blue-400" : 
-                  "text-gray-300"
-                )}>
-                  <span className="text-gray-700 select-none w-6 text-right">{i + 1}</span>
-                  <span>{log}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Metrics */}
-          <div className="space-y-6">
             
-            <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <Activity className="h-4 w-4 text-blue-500" />
-                <h4>Compute Units</h4>
-              </div>
-              <div className="text-3xl font-mono font-bold tracking-tighter">
-                {MOCK_SIMULATION_RESULT.unitsConsumed.toLocaleString()}
-                <span className="text-sm font-sans text-muted-foreground font-normal ml-2">CU</span>
-              </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 w-[2%]"></div>
-              </div>
-              <p className="text-xs text-muted-foreground">2.1% of max budget (200,000)</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-5 space-y-4">
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <Coins className="h-4 w-4 text-yellow-500" />
-                <h4>Balance Changes</h4>
-              </div>
-              <div className="space-y-3">
-                {MOCK_SIMULATION_RESULT.balanceChanges.map((change, i) => (
-                  <div key={i} className="text-sm p-3 bg-secondary/50 rounded border border-border/50">
-                    <div className="font-mono text-xs text-muted-foreground truncate mb-1">{change.address}</div>
-                    <div className="flex justify-between items-center font-mono">
-                      <span className="text-gray-500">{change.before} SOL</span>
-                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                      <span className={cn(
-                        change.after > change.before ? "text-green-400" : "text-red-400"
-                      )}>
-                        {change.after} SOL
-                      </span>
-                    </div>
+            {isLoading ? (
+              // Loading skeleton
+              <div className="bg-black border border-border rounded-lg p-4 h-[400px] space-y-2 animate-pulse">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="w-6 h-4 bg-muted/20 rounded" />
+                    <div className="flex-1 h-4 bg-muted/20 rounded" style={{ width: `${60 + Math.random() * 30}%` }} />
                   </div>
                 ))}
               </div>
-            </div>
+            ) : result ? (
+              // Real data
+              <div className="bg-black border border-border rounded-lg p-4 font-mono text-xs h-[400px] overflow-y-auto">
+                {result.error && (
+                  <div className="text-red-400 font-bold border-b border-red-900/30 pb-2 mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" /> Error: {result.error}
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  {result.logs.length > 0 ? result.logs.map((log, i) => (
+                    <div key={i} className={cn(
+                      "flex gap-3",
+                      log.toLowerCase().includes("success") ? "text-green-400" : 
+                      log.toLowerCase().includes("consumed") ? "text-blue-400" : 
+                      log.toLowerCase().includes("error") ? "text-red-400" :
+                      "text-gray-300"
+                    )}>
+                      <span className="text-gray-700 select-none w-6 text-right">{i + 1}</span>
+                      <span className="break-all">{log}</span>
+                    </div>
+                  )) : (
+                    <div className="text-muted-foreground italic">No logs returned.</div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Empty skeleton
+              <div className="bg-black border border-border/30 rounded-lg p-4 h-[400px] space-y-2 opacity-30">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="w-6 h-4 bg-muted/30 rounded" />
+                    <div className="flex-1 h-4 bg-muted/30 rounded" style={{ width: `${60 + Math.random() * 30}%` }} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Metrics Sidebar */}
+          <div className="space-y-6">
+            
+            {/* Compute Units Card */}
+            {isLoading ? (
+              <div className="bg-card border border-border rounded-lg p-5 space-y-4 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-muted rounded" />
+                  <div className="h-4 w-32 bg-muted rounded" />
+                </div>
+                <div className="h-10 w-40 bg-muted rounded" />
+                <div className="h-2 bg-muted rounded-full" />
+                <div className="h-3 w-full bg-muted rounded" />
+              </div>
+            ) : result ? (
+              <div className="bg-card border border-border rounded-lg p-5 space-y-4 shadow-sm">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <Activity className="h-4 w-4 text-blue-500" />
+                  <h4>Compute Units</h4>
+                </div>
+                <div className="text-3xl font-mono font-bold tracking-tighter">
+                  {result.unitsConsumed.toLocaleString()}
+                  <span className="text-sm font-sans text-muted-foreground font-normal ml-2">CU</span>
+                </div>
+                
+                <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 transition-all duration-500" 
+                    style={{ width: `${Math.min((result.unitsConsumed / 200000) * 100, 100)}%` }} 
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {result.unitsConsumed > 0 
+                    ? `${((result.unitsConsumed / 200000) * 100).toFixed(1)}% of standard budget`
+                    : "No consumption data"}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-card/30 border border-border/30 rounded-lg p-5 space-y-4 opacity-30">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  <div className="h-4 w-32 bg-muted/50 rounded" />
+                </div>
+                <div className="h-10 w-40 bg-muted/50 rounded" />
+                <div className="h-2 bg-muted/50 rounded-full" />
+                <div className="h-3 w-full bg-muted/50 rounded" />
+              </div>
+            )}
+
+            {/* Status Card */}
+            {isLoading ? (
+              <div className="bg-card border border-border rounded-lg p-5 space-y-3 animate-pulse border-l-4 border-l-muted">
+                <div className="h-5 w-40 bg-muted rounded" />
+                <div className="h-4 w-full bg-muted rounded" />
+                <div className="h-4 w-3/4 bg-muted rounded" />
+              </div>
+            ) : result ? (
+              <div className={cn(
+                "bg-card border rounded-lg p-5 space-y-2 border-l-4 shadow-sm",
+                result.success ? "border-l-green-500 bg-green-500/5" : "border-l-red-500 bg-red-500/5"
+              )}>
+                <div className="flex items-center gap-2 font-semibold">
+                  {result.success ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-green-500">Transaction Succeeded</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-5 w-5 text-red-500" />
+                      <span className="text-red-500">Transaction Failed</span>
+                    </>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {result.success 
+                    ? "This transaction would execute successfully on the current network state." 
+                    : "This transaction would revert or fail on the current network state."}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-card/30 border border-border/30 rounded-lg p-5 space-y-3 opacity-30 border-l-4 border-l-muted/50">
+                <div className="h-5 w-40 bg-muted/50 rounded" />
+                <div className="h-4 w-full bg-muted/50 rounded" />
+                <div className="h-4 w-3/4 bg-muted/50 rounded" />
+              </div>
+            )}
 
           </div>
         </div>
-      )}
+
+      </div>
     </div>
   );
 }

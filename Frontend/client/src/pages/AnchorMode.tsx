@@ -1,209 +1,441 @@
-import { useState } from "react";
-import { Search, Play, Send, Code2, ChevronRight, Loader2 } from "lucide-react";
-import { MOCK_IDL } from "@/lib/mock-data";
+import { useState, useEffect } from "react";
+import { Search, Loader2, Play, Box, Key, X, ArrowRight, Wallet, Activity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { PublicKey } from "@solana/web3.js";
+
+interface IdlArg {
+  name: string;
+  type: string | object;
+}
+
+interface IdlAccount {
+  name: string;
+  isMut: boolean;
+  isSigner: boolean;
+}
+
+interface IdlInstruction {
+  name: string;
+  accounts: IdlAccount[];
+  args: IdlArg[];
+}
+
+interface FetchedIdl {
+  instructions: IdlInstruction[];
+}
+
+interface ApiSendTxRequest {
+  rpc_url: string;
+  program_id: string;
+  accounts: Array<{
+    pubkey: string;
+    is_signer: boolean;
+    is_writable: boolean;
+  }>;
+  instruction_data: string;
+  sign_with_backend: boolean;
+  fee_payer: string;
+}
+
+function getInstructionDiscriminator(instructionName: string): Buffer {
+  const hash = require('js-sha256').sha256(`global:${instructionName}`);
+  return Buffer.from(hash, 'hex').slice(0, 8);
+}
 
 export default function AnchorMode() {
   const [programId, setProgramId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [idl, setIdl] = useState<typeof MOCK_IDL | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [idl, setIdl] = useState<FetchedIdl | null>(null);
+  const [selectedInstruction, setSelectedInstruction] = useState<IdlInstruction | null>(null);
 
-  const handleFetchIdl = () => {
-    if (!programId) return;
+  const isValidProgramId = (value: string) => {
+    try { new PublicKey(value); return true; } catch { return false; }
+  };
+  const isProgramIdValid = isValidProgramId(programId);
+
+  const handleFetchIdl = async () => {
     setIsLoading(true);
-    // Simulate network delay
-    setTimeout(() => {
-      setIdl(MOCK_IDL);
-      setIsLoading(false);
-      if (MOCK_IDL.instructions.length > 0) {
-        setSelectedMethod(MOCK_IDL.instructions[0].name);
+    setIdl(null);
+
+    try {
+      const res = await fetch(`https://chaincall.onrender.com/solana/idl/${programId}/methods`);
+      
+      if (res.status === 500) {
+        console.error("Error 500: Backend couldn't find or parse IDL");
+        return;
       }
-    }, 1000);
+      
+      if (!res.ok) throw new Error(`Failed to fetch IDL (${res.status})`);
+
+      const data: FetchedIdl = await res.json();
+      setIdl(data);
+    } catch (err: any) {
+      console.error("Error:", err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-  const handleSimulate = () => {
-    setLogs(["Simulating transaction...", "Fetching latest blockhash...", "Simulation successful! Logs below:"]);
-  };
-
-  const currentInstruction = idl?.instructions.find(i => i.name === selectedMethod);
-
+ 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Anchor Auto-Magician</h2>
-        <p className="text-muted-foreground">Enter a Program ID to automatically fetch its IDL and generate a UI.</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+        
+        {/* Header + Input Section */}
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Anchor Mode</h2>
+            <p className="text-muted-foreground mt-1">Fetch and explore on-chain program IDLs.</p>
+          </div>
 
-      {/* Search Section */}
-      <div className="flex gap-4 items-end">
-        <div className="flex-1 space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">Program ID</label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input 
-                value={programId}
-                onChange={(e) => setProgramId(e.target.value)}
-                placeholder="Enter Program ID"
-                className="w-full bg-secondary/50 border border-border rounded-md py-2.5 pl-10 pr-4 text-sm font-mono focus:ring-1 focus:ring-primary/30 outline-none transition-all"
-              />
+          <div className="flex gap-4 items-end">
+            <div className="flex-1 space-y-2">
+              <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground/80">Program ID</label>
+              <div className="relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  value={programId}
+                  onChange={(e) => setProgramId(e.target.value)}
+                  placeholder="Ex: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+                  className="w-full bg-background/50 border border-border/50 rounded-lg py-3 pl-10 pr-4 font-mono text-sm focus:ring-1 focus:ring-primary/50 outline-none transition-all shadow-sm"
+                />
+              </div>
             </div>
-            <button 
+            <button
               onClick={handleFetchIdl}
-              disabled={isLoading || !programId}
-              className="bg-primary text-primary-foreground px-6 py-2 rounded-md font-medium text-sm hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-w-[100px] flex items-center justify-center"
+              disabled={isLoading || !isProgramIdValid}
+              className={cn(
+                "px-6 py-3 rounded-lg font-medium text-sm flex items-center gap-2 transition-all shadow-sm",
+                isLoading || !isProgramIdValid
+                  ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
+              )}
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Fetch IDL"}
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+              Fetch IDL
             </button>
           </div>
         </div>
-      </div>
 
-      <AnimatePresence mode="wait">
-        {idl && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-          >
-            {/* Methods Sidebar */}
-            <div className="bg-card border border-border rounded-lg overflow-hidden h-fit">
-              <div className="p-4 border-b border-border bg-muted/30">
-                <h3 className="font-medium text-sm flex items-center gap-2">
-                  <Code2 className="h-4 w-4 text-primary" />
-                  Program Methods
-                </h3>
-              </div>
-              <div className="p-2">
-                {idl.instructions.map((instruction) => (
-                  <button
-                    key={instruction.name}
-                    onClick={() => setSelectedMethod(instruction.name)}
-                    className={cn(
-                      "w-full text-left px-3 py-2.5 rounded-md text-sm font-mono transition-colors flex items-center justify-between group",
-                      selectedMethod === instruction.name 
-                        ? "bg-primary/10 text-primary border border-primary/20" 
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    )}
-                  >
-                    {instruction.name}
-                    {selectedMethod === instruction.name && <ChevronRight className="h-3 w-3" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Form Area */}
-            <div className="lg:col-span-2 space-y-6">
-              {currentInstruction && (
-                <motion.div 
-                  key={currentInstruction.name}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="bg-card border border-border rounded-lg overflow-hidden"
-                >
-                  <div className="p-6 border-b border-border">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-mono font-bold text-primary">{currentInstruction.name}</h3>
-                      <span className="text-xs font-mono text-muted-foreground bg-accent px-2 py-1 rounded">
-                        {currentInstruction.args.length} args
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-6">
-                      {/* Accounts */}
-                      <div className="space-y-3">
-                        <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Accounts</h4>
-                        <div className="grid gap-3">
-                          {currentInstruction.accounts.map((acc) => (
-                            <div key={acc.name} className="grid grid-cols-3 gap-4 items-center">
-                              <label className="text-sm font-mono text-foreground/80 flex items-center gap-2">
-                                {acc.name}
-                                {acc.isMut && <span className="text-[10px] bg-orange-500/20 text-orange-500 px-1 rounded">MUT</span>}
-                                {acc.isSigner && <span className="text-[10px] bg-blue-500/20 text-blue-500 px-1 rounded">SIGNER</span>}
-                              </label>
-                              <input 
-                                className="col-span-2 bg-background border border-border rounded px-3 py-1.5 text-sm font-mono focus:ring-1 focus:ring-primary outline-none"
-                                placeholder="Public Key"
-                              />
-                            </div>
+        {/* Table Section - Shows skeleton or real data */}
+        <div className="border border-border/40 rounded-xl overflow-hidden bg-card/30 backdrop-blur-sm shadow-sm">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs uppercase bg-muted/30 text-muted-foreground font-medium">
+              <tr>
+                <th className="px-6 py-4 font-mono w-1/4">Instruction Name</th>
+                <th className="px-6 py-4 font-mono w-1/2">Required Arguments</th>
+                <th className="px-6 py-4 text-right w-1/4">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/30">
+              {isLoading ? (
+                // Skeleton rows while loading
+                [...Array(3)].map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-muted" />
+                        <div className="h-4 w-32 bg-muted rounded" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        <div className="h-6 w-20 bg-muted rounded" />
+                        <div className="h-6 w-24 bg-muted rounded" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="h-7 w-16 bg-muted rounded ml-auto" />
+                    </td>
+                  </tr>
+                ))
+              ) : idl ? (
+                // Real data
+                idl.instructions.map((ix, idx) => (
+                  <tr key={idx} className="group hover:bg-muted/20 transition-colors">
+                    <td className="px-6 py-4 font-medium text-foreground">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-blue-500/50 group-hover:bg-blue-500 transition-colors" />
+                        {ix.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-mono text-muted-foreground">
+                      {ix.args.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {ix.args.map((arg, i) => (
+                            <span key={i} className="bg-secondary/50 px-2 py-1 rounded text-xs border border-border/50">
+                              {arg.name}
+                            </span>
                           ))}
                         </div>
+                      ) : <span className="opacity-30 italic">No arguments</span>}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => setSelectedInstruction(ix)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all"
+                      >
+                        <Play className="h-3 w-3 fill-current" /> Run
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                // Empty state - skeleton placeholder
+                [...Array(3)].map((_, idx) => (
+                  <tr key={idx} className="opacity-40">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-muted/50" />
+                        <div className="h-4 w-32 bg-muted/30 rounded" />
                       </div>
-
-                      {/* Arguments */}
-                      {currentInstruction.args.length > 0 && (
-                        <div className="space-y-3 pt-4 border-t border-border/50">
-                          <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Arguments</h4>
-                          <div className="grid gap-3">
-                            {currentInstruction.args.map((arg) => (
-                              <div key={arg.name} className="grid grid-cols-3 gap-4 items-center">
-                                <label className="text-sm font-mono text-foreground/80">
-                                  {arg.name} <span className="text-muted-foreground text-xs">({arg.type})</span>
-                                </label>
-                                <input 
-                                  className="col-span-2 bg-background border border-border rounded px-3 py-1.5 text-sm font-mono focus:ring-1 focus:ring-primary outline-none"
-                                  placeholder={`Value for ${arg.name}`}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-muted/30 flex items-center justify-end gap-3">
-                    <button 
-                      onClick={handleSimulate}
-                      className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent transition-colors border border-border bg-background"
-                    >
-                      <Play className="h-3.5 w-3.5" />
-                      Simulate
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20">
-                      <Send className="h-3.5 w-3.5" />
-                      Send Transaction
-                    </button>
-                  </div>
-                </motion.div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        <div className="h-6 w-20 bg-muted/30 rounded" />
+                        <div className="h-6 w-24 bg-muted/30 rounded" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="h-7 w-16 bg-muted/30 rounded ml-auto" />
+                    </td>
+                  </tr>
+                ))
               )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-              {/* Logs Output */}
-              {logs.length > 0 && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="bg-black rounded-lg border border-border p-4 font-mono text-xs"
-                >
-                  <div className="flex items-center justify-between mb-2 text-muted-foreground">
-                    <span>Simulation Logs</span>
-                    <button onClick={() => setLogs([])} className="hover:text-foreground">Clear</button>
-                  </div>
-                  <div className="space-y-1 text-green-400/90">
-                    {logs.map((log, i) => (
-                      <div key={i} className="break-all">{`> ${log}`}</div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
+      <AnimatePresence>
+        {selectedInstruction && (
+          <ExecutorModal 
+            instruction={selectedInstruction} 
+            programId={programId}
+            onClose={() => setSelectedInstruction(null)} 
+          />
         )}
       </AnimatePresence>
-
-      {!idl && !isLoading && (
-        <div className="text-center py-20 text-muted-foreground border border-dashed border-border rounded-lg bg-accent/5">
-          <div className="bg-accent/50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Search className="h-6 w-6 opacity-50" />
-          </div>
-          <p>No IDL loaded. Enter a program ID above to get started.</p>
-        </div>
-      )}
     </div>
   );
+}
+
+function ExecutorModal({ 
+    instruction, 
+    programId, 
+    onClose 
+}: { 
+    instruction: IdlInstruction; 
+    programId: string;
+    onClose: () => void 
+}) {
+    const [isSending, setIsSending] = useState(false);
+    const [responseStatus, setResponseStatus] = useState<number | null>(null);
+    const [responseMessage, setResponseMessage] = useState<string>("");
+    
+    const [argValues, setArgValues] = useState<Record<string, string>>({});
+    const [accountValues, setAccountValues] = useState<Record<string, string>>({});
+
+    const handleSend = async () => {
+        setIsSending(true);
+        setResponseStatus(null);
+        setResponseMessage("");
+
+        const discriminator = getInstructionDiscriminator(instruction.name);
+        
+        try {
+            const argsBuffer = Buffer.alloc(1024);
+            let offset = 0;
+            
+            discriminator.copy(argsBuffer, offset);
+            offset += 8;
+            
+            for (const arg of instruction.args) {
+                const value = argValues[arg.name];
+                const argType = typeof arg.type === 'string' ? arg.type : 'string';
+                
+                if (argType === 'u64' || argType === 'u128') {
+                    const bn = BigInt(value || '0');
+                    argsBuffer.writeBigUInt64LE(bn, offset);
+                    offset += 8;
+                } else if (argType === 'u32') {
+                    argsBuffer.writeUInt32LE(parseInt(value || '0'), offset);
+                    offset += 4;
+                } else if (argType === 'u16') {
+                    argsBuffer.writeUInt16LE(parseInt(value || '0'), offset);
+                    offset += 2;
+                } else if (argType === 'u8') {
+                    argsBuffer.writeUInt8(parseInt(value || '0'), offset);
+                    offset += 1;
+                } else if (argType === 'string') {
+                    const strBytes = Buffer.from(value || '', 'utf8');
+                    argsBuffer.writeUInt32LE(strBytes.length, offset);
+                    offset += 4;
+                    strBytes.copy(argsBuffer, offset);
+                    offset += strBytes.length;
+                } else if (argType === 'bool') {
+                    argsBuffer.writeUInt8(value === 'true' ? 1 : 0, offset);
+                    offset += 1;
+                } else if (argType === 'publicKey' || argType === 'PublicKey') {
+                    try {
+                        const pubkey = new PublicKey(value);
+                        const pubkeyBytes = pubkey.toBuffer();
+                        pubkeyBytes.copy(argsBuffer, offset);
+                        offset += 32;
+                    } catch {
+                        throw new Error(`Invalid PublicKey for ${arg.name}`);
+                    }
+                } else {
+                    const strBytes = Buffer.from(value || '', 'utf8');
+                    argsBuffer.writeUInt32LE(strBytes.length, offset);
+                    offset += 4;
+                    strBytes.copy(argsBuffer, offset);
+                    offset += strBytes.length;
+                }
+            }
+            
+            const finalBuffer = argsBuffer.slice(0, offset);
+            const instructionData = finalBuffer.toString('base64');
+
+            const payload: ApiSendTxRequest = {
+                rpc_url: "https://api.devnet.solana.com",
+                program_id: programId,
+                accounts: instruction.accounts.map(acc => ({
+                    pubkey: accountValues[acc.name] || "",
+                    is_signer: acc.isSigner,
+                    is_writable: acc.isMut
+                })),
+                instruction_data: instructionData,
+                sign_with_backend: false,
+                fee_payer: accountValues['authority'] || accountValues['payer'] || ""
+            };
+
+            const res = await fetch("https://chaincall.onrender.com/solana/tx/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            setResponseStatus(res.status);
+            const json = await res.json();
+
+            if (res.ok) {
+                setResponseMessage(json.signature || "Transaction sent successfully!");
+            } else {
+                setResponseMessage(json.error || `Error: ${res.status}`);
+            }
+
+        } catch (error: any) {
+            setResponseStatus(500);
+            setResponseMessage(error.message || "Failed to send transaction");
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={onClose}
+                className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            />
+
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="relative w-full max-w-lg bg-card border border-border shadow-2xl rounded-xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+                <div className="px-6 py-4 border-b border-border/40 flex justify-between items-center bg-muted/20">
+                    <div className="space-y-1">
+                        <h3 className="font-semibold flex items-center gap-2">
+                           <Box className="h-4 w-4 text-primary" /> 
+                           Execute: <span className="font-mono text-primary">{instruction.name}</span>
+                        </h3>
+                    </div>
+                    <button onClick={onClose} className="p-1 hover:bg-muted rounded-md transition-colors"><X className="h-4 w-4" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {instruction.args.length > 0 && (
+                        <div className="space-y-4">
+                             <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                Variables (Arguments)
+                             </h4>
+                             <div className="grid gap-3">
+                                {instruction.args.map((arg, i) => (
+                                    <div key={i} className="flex flex-col space-y-1.5">
+                                        <label className="text-sm font-medium flex justify-between">
+                                            {arg.name}
+                                            <span className="text-xs text-muted-foreground font-mono">
+                                                {typeof arg.type === 'string' ? arg.type : 'custom'}
+                                            </span>
+                                        </label>
+                                        <input 
+                                            value={argValues[arg.name] || ""}
+                                            onChange={(e) => setArgValues(prev => ({...prev, [arg.name]: e.target.value}))}
+                                            placeholder={`Value for ${arg.name}`}
+                                            className="bg-background border border-border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-primary/50 outline-none"
+                                        />
+                                    </div>
+                                ))}
+                             </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-4">
+                        <h4 className="text-xs font-mono uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                           <Key className="h-3 w-3" /> Accounts Config
+                        </h4>
+                        <div className="grid gap-3">
+                            {instruction.accounts.map((acc, i) => (
+                                <div key={i} className="flex flex-col space-y-1.5">
+                                    <label className="text-sm font-medium flex items-center gap-2">
+                                        {acc.name}
+                                        <div className="flex gap-1">
+                                            {acc.isMut && <span className="text-[10px] bg-orange-500/10 text-orange-500 px-1.5 py-0.5 rounded border border-orange-500/20">Writable</span>}
+                                            {acc.isSigner && <span className="text-[10px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20">Signer</span>}
+                                        </div>
+                                    </label>
+                                    <input 
+                                        value={accountValues[acc.name] || ""}
+                                        onChange={(e) => setAccountValues(prev => ({...prev, [acc.name]: e.target.value}))}
+                                        placeholder="Public Key"
+                                        className="bg-background border border-border rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-primary/50 outline-none"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-border/40 bg-muted/10 space-y-3">
+                    <button 
+                        onClick={handleSend}
+                        disabled={isSending}
+                        className={cn(
+                            "w-full h-10 rounded-md font-medium text-sm flex items-center justify-center transition-all",
+                            isSending ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        )}
+                    >
+                        {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Transaction"}
+                    </button>
+                    
+                    {responseStatus && (
+                        <div className="space-y-2">
+                            <div className={cn("text-xs text-center font-mono py-2 rounded", responseStatus === 200 ? "text-green-500 bg-green-500/10" : "text-red-500 bg-red-500/10")}>
+                                Status: {responseStatus}
+                            </div>
+                            {responseMessage && (
+                                <div className="text-xs text-center font-mono py-2 rounded bg-muted/50 break-all">
+                                    {responseMessage}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </motion.div>
+        </div>
+    );
 }

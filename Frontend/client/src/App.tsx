@@ -7,11 +7,13 @@ import AnchorMode from "@/pages/AnchorMode";
 import InstructionBuilder from "@/pages/InstructionBuilder";
 import Simulator from "@/pages/Simulator";
 import NotFound from "@/pages/not-found";
+import WelcomeModal from "@/components/WelcomeModal";
 
 function Router() {
   return (
     <Layout>
       <Switch>
+        
         <Route path="/" component={AnchorMode} />
         <Route path="/builder" component={InstructionBuilder} />
         <Route path="/simulator" component={Simulator} />
@@ -24,6 +26,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <WelcomeModal />
       <Router />
       <Toaster />
     </QueryClientProvider>
