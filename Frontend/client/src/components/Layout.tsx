@@ -1,14 +1,14 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  LayoutDashboard, 
   Binary, 
   TerminalSquare, 
-  Settings, 
   Zap,
   Wallet,
   Globe,
-  Box
+  Box,
+  ChevronRight,
+  ChevronLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,58 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
+  const [sidebarWidth, setSidebarWidth] = useState(260);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const MIN_WIDTH = 200;
+  const MAX_WIDTH = 400;
+  const COLLAPSE_THRESHOLD = 180;
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      
+      const newWidth = e.clientX;
+
+      if (newWidth < COLLAPSE_THRESHOLD) {
+        setIsCollapsed(true);
+        setSidebarWidth(0);
+      } else {
+        setIsCollapsed(false);
+        const constrainedWidth = Math.max(MIN_WIDTH, Math.min(newWidth, MAX_WIDTH));
+        setSidebarWidth(constrainedWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "default";
+      document.body.style.userSelect = "auto";
+    };
+  }, [isDragging]);
+
+  const toggleSidebar = () => {
+    if (isCollapsed) {
+      setIsCollapsed(false);
+      setSidebarWidth(MIN_WIDTH);
+    } else {
+      setIsCollapsed(true);
+      setSidebarWidth(0);
+    }
+  };
 
   const navItems = [
     { href: "/", label: "Anchor Auto-Magician", icon: Zap },
@@ -28,65 +80,109 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden font-sans">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-card/50 backdrop-blur-xl flex flex-col">
-        <div className="p-6 border-b border-border">
+      <aside 
+        className={cn(
+          "border-r border-border bg-card/50 backdrop-blur-xl flex flex-col shrink-0 relative",
+          !isDragging && "transition-all duration-300 ease-in-out"
+        )}
+        style={{ 
+          width: isCollapsed ? 0 : sidebarWidth,
+          opacity: isCollapsed ? 0 : 1,
+          visibility: isCollapsed ? 'hidden' : 'visible'
+        }}
+      >
+        {/* Header */}
+        <div className="h-16 p-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2 text-primary">
             <Box className="h-6 w-6" />
-            <h1 className="font-bold text-lg tracking-tight">Solana Postman</h1>
+            <h1 className="font-bold text-lg tracking-tight">ChainCall</h1>
           </div>
-          <p className="text-xs text-muted-foreground mt-1 font-mono">v0.1.0-beta</p>
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 hover:bg-accent rounded-md transition-colors"
+            aria-label="Collapse sidebar"
+          >
+            <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
             return (
-              <Link 
+              <Link
                 key={item.href} 
                 href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200",
-                  isActive 
-                    ? "bg-primary/10 text-primary" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                )}
               >
-                <Icon className="h-4 w-4" />
-                {item.label}
+                <a
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
+                    isActive 
+                      ? "bg-primary/10 text-primary shadow-sm" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </a>
               </Link>
             );
           })}
         </nav>
 
+        {/* Footer Info */}
         <div className="p-4 border-t border-border">
-          <div className="bg-accent/30 rounded-lg p-3 text-xs text-muted-foreground">
-            <p className="mb-2">Status: <span className="text-green-500 font-mono">Online</span></p>
-            <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 w-[98%] animate-pulse" />
-            </div>
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p className="font-medium">Solana Network</p>
+            <p className="font-mono truncate">Devnet</p>
           </div>
         </div>
       </aside>
 
+      {/* Resize Handle */}
+      <div 
+        onMouseDown={() => setIsDragging(true)}
+        className={cn(
+          "w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary transition-colors relative shrink-0",
+          isDragging && "bg-primary",
+          isCollapsed && "w-0"
+        )}
+      >
+        {/* Expand button when collapsed */}
+        {isCollapsed && (
+          <button 
+            onClick={toggleSidebar}
+            className="absolute left-2 top-4 p-2 bg-primary text-primary-foreground rounded-lg shadow-lg hover:scale-110 transition-transform z-50"
+            aria-label="Expand sidebar"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-background/80 backdrop-blur-sm z-10">
-          <div className="flex items-center gap-4 flex-1 max-w-2xl">
-            <div className="flex items-center gap-2 bg-accent/20 px-3 py-1.5 rounded-md border border-border w-full">
-              <Globe className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">RPC URL:</span>
+        <header className={cn(
+          "h-16 border-b border-border flex items-center justify-between px-6 bg-background/80 backdrop-blur-sm shrink-0",
+          isCollapsed && "pl-40"
+        )}>
+          <div className="flex items-center gap-4 flex-1 max-w-3xl">
+            <div className="flex items-center gap-2 bg-accent/20 px-3 py-2 rounded-lg border border-border w-full">
+              <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">RPC:</span>
               <input 
                 type="text" 
-                defaultValue="https://api.devnet.solana.com"
                 className="bg-transparent border-none outline-none text-sm font-mono text-foreground w-full placeholder:text-muted-foreground/50"
+                placeholder="Enter RPC URL"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+          <div className="flex items-center gap-3">
+            <button className="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:shadow-md">
               <Wallet className="h-4 w-4" />
               Connect Wallet
             </button>
@@ -94,7 +190,7 @@ export function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-auto p-6 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
+        <div className="flex-1 overflow-auto p-6 bg-linear-to-br from-primary/5 via-background to-background">
           {children}
         </div>
       </main>
