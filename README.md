@@ -1,6 +1,8 @@
 # ChainCall
 
-A multi-chain smart contract interaction tool for blockchain program introspection, IDL parsing, transaction building, and simulation. Currently supports Solana with an extensible architecture for adding other chains.
+A multi-chain smart contract interaction tool for blockchain program introspection, IDL parsing, transaction building, and simulation. Currently supports Solana with an extensible architecture for additional chains.
+
+🚀 **[Try it live](https://chain-call.vercel.app)**
 
 ## Features
 
@@ -83,6 +85,10 @@ For instruction packing:
 - Other: `bool`, `pubkey`, `string`, `bytes`
 
 ## Getting Started
+
+🔗 **Live Demo**: [https://chain-call.vercel.app](https://chain-call.vercel.app)
+
+🧪 **Test Contract Address**: `BtcuWYrpxC1fxNwsEaMisFUXqhoSsRgAZU7HtpbxhnBm`
 
 ### Backend Setup
 
