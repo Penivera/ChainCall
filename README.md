@@ -4,6 +4,7 @@ A multi-chain smart contract interaction tool for blockchain program introspecti
 
 🚀 **[Try it live](https://chain-call.vercel.app)**
 
+**CA: BtcuWYrpxC1fxNwsEaMisFUXqhoSsRgAZU7HtpbxhnBm**
 ## Features
 
 - **Anchor Auto-Magician**: Automatically fetch Anchor IDL for Solana programs and generate a UI for interacting with program methods
