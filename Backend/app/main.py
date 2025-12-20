@@ -39,8 +39,14 @@ app.add_middleware(
 app.include_router(solana_router)
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global exception: {str(exc)}", exc_info=True)
     chain = None
     if hasattr(request, "url") and request.url.path:
         parts = request.url.path.strip("/").split("/")

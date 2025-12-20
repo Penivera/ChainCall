@@ -11,9 +11,47 @@ from ...models.schemas import (
 )
 import os
 import base64
+import logging
+import json
 from solders.keypair import Keypair
+from ...core.configs import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tx", tags=["Solana - Transactions"])
+
+
+def get_backend_keypair() -> Keypair:
+    """Load the backend keypair from environment variables."""
+    backend_keypair_env = settings.BACKEND_SOLANA_KEYPAIR
+    if not backend_keypair_env:
+        raise ValueError("BACKEND_SOLANA_KEYPAIR environment variable is not set")
+
+    try:
+        # Check if the key is a JSON array (byte list) or a Base58 string
+        key_str = backend_keypair_env.strip()
+        if key_str.startswith("["):
+            # It's a JSON array of bytes
+            key_bytes = json.loads(key_str)
+            return Keypair.from_bytes(key_bytes)
+        else:
+            # Assume it's a Base58 string
+            return Keypair.from_base58_string(key_str)
+    except Exception as e:
+        raise ValueError(f"Invalid backend keypair: {str(e)}")
+
+
+@router.get(
+    "/wallet",
+    summary="Get Backend Wallet Info",
+    description="Get the public key of the backend wallet used for signing",
+)
+async def get_backend_wallet():
+    try:
+        keypair = get_backend_keypair()
+        return {"pubkey": str(keypair.pubkey())}
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post(
@@ -141,16 +179,14 @@ async def send_transaction(request: SendTransactionRequest):
             )
 
         # Load backend keypair
-        backend_keypair_env = os.getenv("BACKEND_SOLANA_KEYPAIR")
-        if not backend_keypair_env:
-            raise HTTPException(
-                status_code=500, detail="Backend keypair not configured"
-            )
-
         try:
-            backend_keypair = Keypair.from_base58_secret(backend_keypair_env)
-        except Exception:
-            raise HTTPException(status_code=500, detail="Invalid backend keypair")
+            backend_keypair = get_backend_keypair()
+            logger.info(
+                f"Loaded backend keypair for public key: {backend_keypair.pubkey()}"
+            )
+        except ValueError as e:
+            logger.error(f"Backend keypair error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
 
         rpc_client = SolanaRPCClient(request.rpc_url)
         tx_builder = SolanaTxBuilder()
@@ -173,6 +209,10 @@ async def send_transaction(request: SendTransactionRequest):
                 for acc in request.accounts
             ]
 
+            logger.info(
+                f"Building instruction for program {request.program_id} with accounts: {json.dumps(accounts)}"
+            )
+
             instruction = tx_builder.build_instruction(
                 request.program_id, accounts, instruction_bytes
             )
@@ -186,14 +226,37 @@ async def send_transaction(request: SendTransactionRequest):
 
             # Sign with backend keypair
             unsigned_tx = unsigned_result["transaction"]
-            unsigned_tx.sign([backend_keypair], unsigned_tx.message.recent_blockhash)
+            try:
+                # Use partial_sign to allow for cases where backend is one of multiple signers
+                # (though sending will fail if others are missing)
+                unsigned_tx.partial_sign(
+                    [backend_keypair], unsigned_tx.message.recent_blockhash
+                )
+            except ValueError as e:
+                if "keypair-pubkey mismatch" in str(e):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Backend wallet {backend_keypair.pubkey()} is not a required signer for this transaction. Please ensure the backend wallet is set as a signer or fee payer.",
+                    )
+                raise e
 
             signed_transaction_base64 = base64.b64encode(bytes(unsigned_tx)).decode(
                 "utf-8"
             )
 
-        finally:
-            await rpc_client.close()
+        except HTTPException:
+            raise
+        except ValueError as e:
+            logger.error(f"Validation error building transaction: {str(e)}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid transaction data: {str(e)}"
+            )
+        except Exception as e:
+            print(f"DEBUG: Build/Sign Error: {e}")
+            logger.error(f"Error building/signing transaction: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500, detail=f"Error processing transaction: {str(e)}"
+            )
 
     else:
         # Expect signed transaction
@@ -211,8 +274,29 @@ async def send_transaction(request: SendTransactionRequest):
         return SendTransactionResponse(chain="solana", signature=result, success=True)
 
     except Exception as e:
+        error_msg = str(e)
+        print(f"DEBUG: Transaction Send Error: {error_msg}")
+
+        if (
+            "Signature verification failed" in error_msg
+            or "Transaction signature verification failure" in error_msg
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Transaction signature verification failed. Ensure all required signers have signed. Error: {error_msg}",
+            )
+
+        if (
+            "Simulation failed" in error_msg
+            or "InstructionError" in error_msg
+            or "Transaction simulation failed" in error_msg
+        ):
+            raise HTTPException(
+                status_code=400, detail=f"Transaction simulation failed: {error_msg}"
+            )
+
         raise HTTPException(
-            status_code=500, detail=f"Error sending transaction: {str(e)}"
+            status_code=500, detail=f"Error sending transaction: {error_msg}"
         )
     finally:
         await rpc_client.close()
