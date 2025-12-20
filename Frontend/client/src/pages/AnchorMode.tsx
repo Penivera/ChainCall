@@ -593,7 +593,7 @@ function ensureNumberRange(
 
 export default function AnchorMode() {
   const [programId, setProgramId] = useState("");
-  const [network, setNetwork] = useState("mainnet");
+  const [network, setNetwork] = useState("devnet");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idl, setIdl] = useState<FetchedIdl | null>(null);
