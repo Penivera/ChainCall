@@ -22,7 +22,7 @@ interface IdlInstruction {
 }
 
 interface FetchedIdl {
-  instructions: IdlInstruction[];
+  methods: IdlInstruction[];
 }
 
 interface ApiSendTxRequest {
@@ -38,6 +38,8 @@ interface ApiSendTxRequest {
   fee_payer: string;
 }
 
+import { Buffer } from 'buffer';
+
 function getInstructionDiscriminator(instructionName: string): Buffer {
   const hash = require('js-sha256').sha256(`global:${instructionName}`);
   return Buffer.from(hash, 'hex').slice(0, 8);
@@ -45,7 +47,9 @@ function getInstructionDiscriminator(instructionName: string): Buffer {
 
 export default function AnchorMode() {
   const [programId, setProgramId] = useState("");
+  const [network, setNetwork] = useState("mainnet");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [idl, setIdl] = useState<FetchedIdl | null>(null);
   const [selectedInstruction, setSelectedInstruction] = useState<IdlInstruction | null>(null);
 
@@ -57,21 +61,26 @@ export default function AnchorMode() {
   const handleFetchIdl = async () => {
     setIsLoading(true);
     setIdl(null);
+    setError(null);
 
     try {
-      const res = await fetch(`https://chaincall.onrender.com/solana/idl/${programId}/methods`);
+      const rpcUrl = network === "mainnet" 
+        ? "https://api.mainnet-beta.solana.com" 
+        : "https://api.devnet.solana.com";
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+      const res = await fetch(`${baseUrl}/solana/idl/${programId}/methods?rpc_url=${encodeURIComponent(rpcUrl)}`);
       
-      if (res.status === 500) {
-        console.error("Error 500: Backend couldn't find or parse IDL");
-        return;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to fetch IDL (${res.status})`);
       }
-      
-      if (!res.ok) throw new Error(`Failed to fetch IDL (${res.status})`);
 
       const data: FetchedIdl = await res.json();
       setIdl(data);
     } catch (err: any) {
       console.error("Error:", err.message);
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +98,25 @@ export default function AnchorMode() {
           </div>
 
           <div className="flex gap-4 items-end">
+            <div className="w-32 space-y-2">
+              <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground/80">Network</label>
+              <div className="relative">
+                <select 
+                  value={network}
+                  onChange={(e) => setNetwork(e.target.value)}
+                  className="w-full bg-background/50 border border-border/50 rounded-lg py-3 px-3 font-mono text-sm focus:ring-1 focus:ring-primary/50 outline-none transition-all shadow-sm appearance-none cursor-pointer"
+                >
+                  <option value="mainnet">Mainnet</option>
+                  <option value="devnet">Devnet</option>
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                  <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
             <div className="flex-1 space-y-2">
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground/80">Program ID</label>
               <div className="relative group">
@@ -119,6 +147,12 @@ export default function AnchorMode() {
 
         {/* Table Section - Shows skeleton or real data */}
         <div className="border border-border/40 rounded-xl overflow-hidden bg-card/30 backdrop-blur-sm shadow-sm">
+          {error && (
+            <div className="p-4 bg-destructive/10 text-destructive text-sm border-b border-destructive/20 flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              {error}
+            </div>
+          )}
           <table className="w-full text-sm text-left">
             <thead className="text-xs uppercase bg-muted/30 text-muted-foreground font-medium">
               <tr>
@@ -149,9 +183,9 @@ export default function AnchorMode() {
                     </td>
                   </tr>
                 ))
-              ) : idl ? (
+              ) : idl && idl.methods ? (
                 // Real data
-                idl.instructions.map((ix, idx) => (
+                idl.methods.map((ix, idx) => (
                   <tr key={idx} className="group hover:bg-muted/20 transition-colors">
                     <td className="px-6 py-4 font-medium text-foreground">
                       <div className="flex items-center gap-2">
