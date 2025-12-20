@@ -643,8 +643,8 @@ export default function AnchorMode() {
             <p className="text-muted-foreground mt-1">Fetch and explore on-chain program IDLs.</p>
           </div>
 
-          <div className="flex gap-4 items-end">
-            <div className="w-32 space-y-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="w-full sm:w-32 space-y-2">
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground/80">Network</label>
               <div className="relative">
                 <select 
@@ -663,7 +663,7 @@ export default function AnchorMode() {
               </div>
             </div>
 
-            <div className="flex-1 space-y-2">
+            <div className="flex-1 space-y-2 w-full">
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground/80">Program ID</label>
               <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -679,7 +679,7 @@ export default function AnchorMode() {
               onClick={handleFetchIdl}
               disabled={isLoading || !isProgramIdValid}
               className={cn(
-                "px-6 py-3 rounded-lg font-medium text-sm flex items-center gap-2 transition-all shadow-sm",
+                "w-full sm:w-auto px-6 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all shadow-sm",
                 isLoading || !isProgramIdValid
                   ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -692,98 +692,100 @@ export default function AnchorMode() {
         </div>
 
         {/* Table Section - Shows skeleton or real data */}
-        <div className="border border-border/40 rounded-xl overflow-hidden bg-card/30 backdrop-blur-sm shadow-sm">
+        <div className="border border-border/40 rounded-xl bg-card/30 backdrop-blur-sm shadow-sm">
           {error && (
             <div className="p-4 bg-destructive/10 text-destructive text-sm border-b border-destructive/20 flex items-center gap-2">
               <Activity className="h-4 w-4" />
               {error}
             </div>
           )}
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs uppercase bg-muted/30 text-muted-foreground font-medium">
-              <tr>
-                <th className="px-6 py-4 font-mono w-1/4">Instruction Name</th>
-                <th className="px-6 py-4 font-mono w-1/2">Required Arguments</th>
-                <th className="px-6 py-4 text-right w-1/4">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {isLoading ? (
-                // Skeleton rows while loading
-                [...Array(3)].map((_, idx) => (
-                  <tr key={idx} className="animate-pulse">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-muted" />
-                        <div className="h-4 w-32 bg-muted rounded" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <div className="h-6 w-20 bg-muted rounded" />
-                        <div className="h-6 w-24 bg-muted rounded" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="h-7 w-16 bg-muted rounded ml-auto" />
-                    </td>
-                  </tr>
-                ))
-              ) : idl && idl.methods ? (
-                // Real data
-                idl.methods.map((ix, idx) => (
-                  <tr key={idx} className="group hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4 font-medium text-foreground">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-blue-500/50 group-hover:bg-blue-500 transition-colors" />
-                        {ix.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-muted-foreground">
-                      {ix.args.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {ix.args.map((arg, i) => (
-                            <span key={i} className="bg-secondary/50 px-2 py-1 rounded text-xs border border-border/50">
-                              {arg.name}
-                            </span>
-                          ))}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm text-left">
+              <thead className="text-xs uppercase bg-muted/30 text-muted-foreground font-medium">
+                <tr>
+                  <th className="px-6 py-4 font-mono w-1/4">Instruction Name</th>
+                  <th className="px-6 py-4 font-mono w-1/2">Required Arguments</th>
+                  <th className="px-6 py-4 text-right w-1/4">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/30">
+                {isLoading ? (
+                  // Skeleton rows while loading
+                  [...Array(3)].map((_, idx) => (
+                    <tr key={idx} className="animate-pulse">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-muted" />
+                          <div className="h-4 w-32 bg-muted rounded" />
                         </div>
-                      ) : <span className="opacity-30 italic">No arguments</span>}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => setSelectedInstruction(ix)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all"
-                      >
-                        <Play className="h-3 w-3 fill-current" /> Run
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                // Empty state - skeleton placeholder
-                [...Array(3)].map((_, idx) => (
-                  <tr key={idx} className="opacity-40">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-muted/50" />
-                        <div className="h-4 w-32 bg-muted/30 rounded" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <div className="h-6 w-20 bg-muted/30 rounded" />
-                        <div className="h-6 w-24 bg-muted/30 rounded" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="h-7 w-16 bg-muted/30 rounded ml-auto" />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <div className="h-6 w-20 bg-muted rounded" />
+                          <div className="h-6 w-24 bg-muted rounded" />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="h-7 w-16 bg-muted rounded ml-auto" />
+                      </td>
+                    </tr>
+                  ))
+                ) : idl && idl.methods ? (
+                  // Real data
+                  idl.methods.map((ix, idx) => (
+                    <tr key={idx} className="group hover:bg-muted/20 transition-colors">
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-blue-500/50 group-hover:bg-blue-500 transition-colors" />
+                          {ix.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-muted-foreground">
+                        {ix.args.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {ix.args.map((arg, i) => (
+                              <span key={i} className="bg-secondary/50 px-2 py-1 rounded text-xs border border-border/50">
+                                {arg.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : <span className="opacity-30 italic">No arguments</span>}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button 
+                          onClick={() => setSelectedInstruction(ix)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-all"
+                        >
+                          <Play className="h-3 w-3 fill-current" /> Run
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  // Empty state - skeleton placeholder
+                  [...Array(3)].map((_, idx) => (
+                    <tr key={idx} className="opacity-40">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-muted/50" />
+                          <div className="h-4 w-32 bg-muted/30 rounded" />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <div className="h-6 w-20 bg-muted/30 rounded" />
+                          <div className="h-6 w-24 bg-muted/30 rounded" />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="h-7 w-16 bg-muted/30 rounded ml-auto" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
