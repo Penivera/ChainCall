@@ -62,7 +62,14 @@ async def root():
     supported_chains = ChainRegistry.get_supported_chains()
     chain_configs = ChainRegistry.get_all_chain_configs()
     
-    endpoints = {}
+    endpoints = {
+        "info": {
+            "GET /": "API information and available endpoints",
+            "GET /health": "Health check endpoint",
+            "GET /chains": "List supported chains with features and data types"
+        }
+    }
+    
     for chain in supported_chains:
         endpoints[chain] = {
             "idl": {
