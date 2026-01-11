@@ -13,8 +13,8 @@ import {
   Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useWallet } from "../../context/WalletProvider"
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useWallet } from "../../context/WalletProvider";
+import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
   
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,10 +22,18 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
-  
-  
-  const { isConnected, walletAddress, connectWallet, disconnectWallet, isLoading, hasAnyWallet } = useWallet();
-  const { rpcUrl, setRpcUrl } = useWallet();
+  const { 
+    isConnected, 
+    walletAddress, 
+    connectWallet, 
+    disconnectWallet, 
+    isLoading, 
+    hasAnyWallet,
+    network,
+    switchNetwork,
+    rpcUrl,
+    setRpcUrl
+  } = useWallet();
 
   const [sidebarWidth, setSidebarWidth] = useState(260);
   const [isDragging, setIsDragging] = useState(false);
@@ -34,8 +42,6 @@ export function Layout({ children }: LayoutProps) {
   const MIN_WIDTH = 200;
   const MAX_WIDTH = 400;
   const COLLAPSE_THRESHOLD = 180;
-
-  
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -82,9 +88,6 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
-
-
-
   const navItems = [
     { href: "/", label: "Anchor Auto-Magician", icon: Zap },
     { href: "/builder", label: "Instruction Builder", icon: Binary },
@@ -93,7 +96,6 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden font-sans">
-      {/* Sidebar */}
       <aside 
         className={cn(
           "border-r border-border bg-card/50 backdrop-blur-xl flex flex-col shrink-0 relative",
@@ -105,7 +107,6 @@ export function Layout({ children }: LayoutProps) {
           visibility: isCollapsed ? 'hidden' : 'visible'
         }}
       >
-        {/* Header */}
         <div className="h-16 p-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2 text-primary">
             <Box className="h-6 w-6" />
@@ -120,16 +121,12 @@ export function Layout({ children }: LayoutProps) {
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
             return (
-              <Link
-                key={item.href} 
-                href={item.href}
-              >
+              <Link key={item.href} href={item.href}>
                 <a
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
@@ -146,16 +143,38 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        {/* Footer Info */}
         <div className="p-4 border-t border-border">
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p className="font-medium">Solana Network</p>
-            <p className="font-mono truncate">Devnet</p>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Network
+            </p>
+            
+            <div className="relative group">
+              <select
+                value={network}
+                onChange={(e) => switchNetwork(e.target.value as WalletAdapterNetwork)}
+                className="w-full appearance-none bg-accent/20 hover:bg-accent/40 border border-border text-foreground text-sm rounded-lg pl-9 pr-8 py-2.5 transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value={WalletAdapterNetwork.Devnet}>Devnet</option>
+                <option value={WalletAdapterNetwork.Mainnet}>Mainnet</option>
+              </select>
+              
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className={cn(
+                  "w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]",
+                  network === WalletAdapterNetwork.Mainnet ? "bg-purple-500 shadow-purple-500/50" : "bg-green-500 shadow-green-500/50"
+                )} />
+              </div>
+
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                <div className="border-t-4 border-t-muted-foreground border-x-4 border-x-transparent w-0 h-0" />
+              </div>
+            </div>
+
           </div>
         </div>
       </aside>
 
-      {/* Resize Handle */}
       <div 
         onMouseDown={() => setIsDragging(true)}
         className={cn(
@@ -164,7 +183,6 @@ export function Layout({ children }: LayoutProps) {
           isCollapsed && "w-0"
         )}
       >
-        {/* Expand button when collapsed */}
         {isCollapsed && (
           <button 
             onClick={toggleSidebar}
@@ -176,9 +194,7 @@ export function Layout({ children }: LayoutProps) {
         )}
       </div>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar */}
         <header className={cn(
           "h-16 border-b border-border flex items-center justify-between px-6 bg-background/80 backdrop-blur-sm shrink-0",
           isCollapsed && "pl-40"
@@ -192,7 +208,7 @@ export function Layout({ children }: LayoutProps) {
                 value={rpcUrl}
                 onChange={(e) => setRpcUrl(e.target.value)} 
                 className="bg-transparent border-none outline-none text-sm font-mono text-foreground w-full placeholder:text-muted-foreground/50"
-                placeholder="Enter RPC URL"
+                placeholder="Enter custom RPC URL"
               />
             </div>
           </div>
@@ -200,17 +216,17 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-3">
             {isConnected ? (
               <div className="flex items-center gap-2">
-                 <div className="flex items-center gap-2 bg-green-500/10 text-green-600 border border-green-500/20 px-4 py-2 rounded-lg text-sm font-medium">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="font-mono">{walletAddress}</span>
-                 </div>
-                 <button 
-                   onClick={disconnectWallet}
-                   className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                   title="Disconnect"
-                 >
-                   <LogOut className="h-4 w-4" />
-                 </button>
+                <div className="flex items-center gap-2 bg-green-500/10 text-green-600 border border-green-500/20 px-4 py-2 rounded-lg text-sm font-medium">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="font-mono">{walletAddress}</span>
+                </div>
+                <button 
+                  onClick={disconnectWallet}
+                  className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                  title="Disconnect"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
             ) : (
               <div className="relative group">
@@ -220,14 +236,13 @@ export function Layout({ children }: LayoutProps) {
                   className="flex items-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-4 py-2 rounded-lg text-sm font-medium transition-all hover:shadow-md hover:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
-                     <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                     <Wallet className="h-4 w-4" />
+                    <Wallet className="h-4 w-4" />
                   )}
                   <span className="hidden sm:inline">{isLoading ? "Connecting..." : "Connect Wallet"}</span>
                 </button>
                 
-                {/* Warning tooltip when no wallet is installed */}
                 {!hasAnyWallet && (
                   <div className="absolute right-0 top-full mt-2 w-72 p-3 bg-orange-500/10 border border-orange-500/20 rounded-lg text-xs text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                     <p className="font-semibold mb-1">No wallet detected</p>
@@ -244,7 +259,6 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </header>
 
-        {/* Page Content */}
         <div className="flex-1 overflow-auto p-6 bg-linear-to-br from-primary/5 via-background to-background">
           {children}
         </div>

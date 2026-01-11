@@ -120,11 +120,10 @@ const createId = () => Math.random().toString(36).slice(2, 9);
 
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 
-// Convert camelCase/PascalCase to snake_case for Anchor discriminator
 function toSnakeCase(str: string): string {
   return str
     .replace(/([A-Z])/g, (match, p1, offset) => (offset > 0 ? '_' : '') + p1.toLowerCase())
-    .replace(/^_/, ''); // Remove leading underscore if first char was uppercase
+    .replace(/^_/, ''); 
 }
 
 function getInstructionDiscriminator(instructionName: string): Buffer {
@@ -723,7 +722,7 @@ export default function AnchorMode() {
               </thead>
               <tbody className="divide-y divide-border/30">
                 {isLoading ? (
-                  // Skeleton rows while loading
+
                   [...Array(3)].map((_, idx) => (
                     <tr key={idx} className="animate-pulse">
                       <td className="px-6 py-4">
@@ -744,7 +743,7 @@ export default function AnchorMode() {
                     </tr>
                   ))
                 ) : idl && idl.methods ? (
-                  // Real data
+  
                   idl.methods.map((ix, idx) => (
                     <tr key={idx} className="group hover:bg-muted/20 transition-colors">
                       <td className="px-6 py-4 font-medium text-foreground">
@@ -775,7 +774,7 @@ export default function AnchorMode() {
                     </tr>
                   ))
                 ) : (
-                  // Empty state - skeleton placeholder
+
                   [...Array(3)].map((_, idx) => (
                     <tr key={idx} className="opacity-40">
                       <td className="px-6 py-4">
@@ -1039,7 +1038,7 @@ function ExecutorModal({
 
         const discriminator = getInstructionDiscriminator(instruction.name);
         
-        // Validate accounts
+
         for (const acc of instruction.accounts) {
             if (!accountValues[acc.name]) {
                 setResponseMessage(`Error: Missing public key for account '${acc.name}'`);
@@ -1142,8 +1141,7 @@ function ExecutorModal({
                     }
                 } else {
                     console.warn(`Unsupported or complex type for arg ${arg.name}:`, arg.type);
-                    // Fallback to string for now, but log warning. 
-                    // This is likely where it fails for complex types.
+
                     const strBytes = Buffer.from(value || '', 'utf8');
                     argsBuffer.writeUInt32LE(strBytes.length, offset);
                     offset += 4;

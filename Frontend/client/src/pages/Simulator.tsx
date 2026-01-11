@@ -16,7 +16,6 @@ export default function Simulator() {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const { rpcUrl } = useWallet();
 
-  // Simple simulation - no wallet needed, just paste and simulate
   const handleSimulate = async () => {
     if (!txHash) return;
     setIsLoading(true);
